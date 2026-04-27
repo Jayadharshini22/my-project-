@@ -1,0 +1,6 @@
+Flask==2.3.3
+flask-mysqldb==1.0.1
+Werkzeug==2.3.7
+python-dotenv==1.0.0
+flask-session==0.5.0
+flask-mail==0.10.0
