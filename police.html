@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2><i class="fas fa-building-shield"></i> Tamil Nadu Police Stations</h2>
+    <p>Nearest emergency help points in your district.</p>
+    
+    <div id="map" style="height: 500px;"></div>
+</div>
+
+<div class="card">
+    <h3>Police Contact List</h3>
+    <div class="dashboard-grid">
+        {% for station in stations %}
+        <div class="dash-item" style="text-align: left; padding: 1.5rem;">
+            <h4 style="margin: 0; color: var(--secondary-color);">{{ station.name }}</h4>
+            <p><i class="fas fa-map-marker-alt"></i> {{ station.district }}</p>
+            <p><i class="fas fa-phone"></i> {{ station.phone }}</p>
+            
+            <a href="tel:{{ station.phone }}" class="btn btn-primary" style="padding: 0.5rem 1rem;">
+                Call Now
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+    const stations = {{ stations | tojson | safe }};
+
+    const map = L.map('map').setView([11.1271, 78.6569], 7);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) *
+            Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    // 🔥 NORMAL MARKERS
+    stations.forEach(station => {
+        if (station.latitude && station.longitude) {
+            L.marker([station.latitude, station.longitude])
+                .addTo(map)
+                .bindPopup(`
+                    <strong>${station.name}</strong><br>
+                    ${station.district}<br>
+                    📞 ${station.phone}
+                `);
+        }
+    });
+
+    // 🔥 USER LOCATION + NEAREST POLICE
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+
+            const userLat = position.coords.latitude;
+            const userLng = position.coords.longitude;
+
+            let nearestStation = null;
+            let minDistance = Infinity;
+
+            stations.forEach(station => {
+                if (station.latitude && station.longitude) {
+                    let dist = getDistance(
+                        userLat,
+                        userLng,
+                        station.latitude,
+                        station.longitude
+                    );
+
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        nearestStation = station;
+                    }
+                }
+            });
+
+            // 📍 USER MARKER
+            L.marker([userLat, userLng])
+                .addTo(map)
+                .bindPopup("📍 You are here")
+                .openPopup();
+
+            // 🚓 NEAREST POLICE (GREEN)
+            if (nearestStation) {
+                const greenIcon = L.icon({
+                    iconUrl: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                    iconSize: [32, 32]
+                });
+
+                L.marker([nearestStation.latitude, nearestStation.longitude], {
+                    icon: greenIcon
+                })
+                .addTo(map)
+                .bindPopup(`
+                    🚓 <strong>Nearest Police Station</strong><br>
+                    ${nearestStation.name}<br>
+                    📍 ${nearestStation.district}<br>
+                    📞 ${nearestStation.phone}<br>
+                    🛣️ Distance: ${minDistance.toFixed(2)} km
+                `)
+                .openPopup();
+            }
+
+            map.setView([userLat, userLng], 11);
+
+        });
+    }
+</script>
+
+{% endblock %}
