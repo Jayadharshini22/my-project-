@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card" style="text-align: center;">
+    <h2><i class="fas fa-camera"></i> Evidence Capture</h2>
+    <p>Capture real-time evidence to be stored securely on our server.</p>
+    
+    <div style="margin: 2rem 0;">
+        <video id="preview" width="100%" height="auto" autoplay muted style="border-radius: 15px; background: #000; max-width: 500px;"></video>
+    </div>
+
+    <div id="recordingStatus" style="margin-bottom: 1rem; color: #f44336; font-weight: bold; display: none;">
+        Recording... <span id="timer">0</span>s
+    </div>
+
+    <div class="dashboard-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <button id="photoBtn" class="btn btn-primary"><i class="fas fa-camera"></i> Photo</button>
+        <button id="videoBtn" class="btn btn-primary"><i class="fas fa-video"></i> Video</button>
+        <button id="audioBtn" class="btn btn-primary"><i class="fas fa-microphone"></i> Audio</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3><i class="fas fa-history"></i> Recent Evidence</h3>
+    <div class="dashboard-grid">
+        {% for item in evidence_list %}
+        <div class="dash-item" style="padding: 1rem; text-align: left;">
+            <strong>{{ item.file_type | upper }}</strong><br>
+            <small>{{ item.timestamp }}</small><br>
+            <small>Duration: {{ item.duration }}s</small><br>
+            <a href="{{ url_for('static', filename='uploads/' + item.file_path) }}" target="_blank" style="color: var(--primary-color);">View File</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+    let mediaRecorder;
+    let recordedChunks = [];
+    let startTime;
+    let timerInterval;
+
+    const preview = document.getElementById('preview');
+    const timer = document.getElementById('timer');
+    const recordingStatus = document.getElementById('recordingStatus');
+
+    // Get access to media devices
+    async function startPreview() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            preview.srcObject = stream;
+        } catch (err) {
+            console.error("Error accessing media devices", err);
+        }
+    }
+
+    async function capturePhoto() {
+        const canvas = document.createElement('canvas');
+        canvas.width = preview.videoWidth;
+        canvas.height = preview.videoHeight;
+        canvas.getContext('2d').drawImage(preview, 0, 0);
+        
+        canvas.toBlob(async (blob) => {
+            const formData = new FormData();
+            formData.append('media', blob, 'photo.jpg');
+            formData.append('type', 'photo');
+            await uploadEvidence(formData);
+        }, 'image/jpeg');
+    }
+
+    async function startRecording(type) {
+        recordedChunks = [];
+        const stream = preview.srcObject;
+        const options = { mimeType: type === 'video' ? 'video/webm' : 'audio/webm' };
+        
+        mediaRecorder = new MediaRecorder(stream, options);
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        
+        mediaRecorder.onstop = async () => {
+            const blob = new Blob(recordedChunks, { type: options.mimeType });
+            const duration = Math.round((Date.now() - startTime) / 1000);
+            const formData = new FormData();
+            formData.append('media', blob, type === 'video' ? 'video.webm' : 'audio.webm');
+            formData.append('type', type);
+            formData.append('duration', duration);
+            await uploadEvidence(formData);
+        };
+
+        startTime = Date.now();
+        mediaRecorder.start();
+        recordingStatus.style.display = 'block';
+        
+        let seconds = 0;
+        timerInterval = setInterval(() => {
+            seconds++;
+            timer.innerText = seconds;
+        }, 1000);
+
+        // Record for 10 seconds then stop automatically (or can be manual)
+        setTimeout(() => stopRecording(), 10000);
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            recordingStatus.style.display = 'none';
+            clearInterval(timerInterval);
+            timer.innerText = '0';
+        }
+    }
+
+    async function uploadEvidence(formData) {
+        const response = await fetch('/evidence', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert(result.message);
+            location.reload();
+        }
+    }
+
+    document.getElementById('photoBtn').onclick = capturePhoto;
+    document.getElementById('videoBtn').onclick = () => startRecording('video');
+    document.getElementById('audioBtn').onclick = () => startRecording('audio');
+
+    startPreview();
+</script>
+{% endblock %}
