@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2><i class="fas fa-history"></i> SOS Alert History</h2>
+    <p>Review your past emergency alerts and their delivery status.</p>
+</div>
+
+{% for alert in alerts %}
+<div class="card" style="border-left: 5px solid var(--primary-color);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h4 style="margin: 0;">SOS Triggered</h4>
+            <small style="color: #666;">{{ alert.timestamp }}</small>
+        </div>
+        <div style="text-align: right;">
+            <span style="background: #e8f5e9; color: #2e7d32; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: bold;">
+                {{ alert.status }}
+            </span>
+        </div>
+    </div>
+    <div style="margin-top: 1rem;">
+        <p style="margin: 0.2rem 0;"><i class="fas fa-map-pin"></i> <strong>Location:</strong> {{ alert.address }}</p>
+        <p style="margin: 0.2rem 0;"><i class="fas fa-location-crosshairs"></i> <strong>Coordinates:</strong> {{ alert.latitude }}, {{ alert.longitude }}</p>
+        <a href="https://www.google.com/maps?q={{ alert.latitude }},{{ alert.longitude }}" target="_blank" style="color: var(--secondary-color); font-size: 0.9rem;">
+            View on Google Maps
+        </a>
+    </div>
+</div>
+{% endfor %}
+
+{% if not alerts %}
+<div class="card" style="text-align: center; color: #888;">
+    <p>No SOS history found.</p>
+</div>
+{% endif %}
+{% endblock %}
