@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<div class="card" style="text-align: center;">
+    <h1 style="color: var(--primary-color);">Welcome, {{ session.full_name }}</h1>
+    <p>Your safety is our priority. In case of emergency, tap the SOS button below.</p>
+    
+    <button id="sosBtn" class="btn btn-sos">SOS</button>
+    
+    <div id="statusInfo" style="margin-top: 1rem; font-weight: 500;"></div>
+</div>
+
+<div class="card">
+    <h3>Location Details</h3>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <input type="text" id="locationInput" placeholder="Enter the location (e.g. College Name)" 
+               style="flex: 1; padding: 10px;">
+        <button onclick="searchLocation()" class="btn" style="background: var(--primary-color); color: white;">
+            Search
+        </button>
+    </div>
+
+    <p id="locationText">Fetching current location...</p>
+    <div id="map" style="height: 300px;"></div>
+</div>
+
+<script>
+
+let map, marker;
+let currentLat, currentLng;
+
+function initMap() {
+
+    map = L.map('map').setView([11.1271, 78.6569], 7);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    getLiveLocation();
+}
+
+
+// LIVE LOCATION
+function getLiveLocation(){
+
+navigator.geolocation.getCurrentPosition(
+
+function(position){
+
+    currentLat = position.coords.latitude;
+    currentLng = position.coords.longitude;
+
+    updateMapMarker(currentLat, currentLng, "Live Location 📍");
+
+},
+
+function(error){
+
+    document.getElementById('locationText').innerText =
+    "GPS slow! Enter the location manually 👇";
+
+},
+
+{
+enableHighAccuracy:true,
+timeout:15000,
+maximumAge:0
+});
+
+}
+
+async function searchLocation() {
+
+let query = document.getElementById('locationInput').value.toLowerCase();
+
+if (!query) return alert("Enter location");
+
+
+if(query.includes("mepco")){
+
+updateMapMarker(
+9.46279950,
+77.78910130,
+"Mepco Schlenk Engineering College"
+);
+
+return;
+}
+
+
+
+const response = await fetch(
+`https://nominatim.openstreetmap.org/search?format=json&q=${query},Tamil Nadu,India&limit=1`
+);
+
+const data = await response.json();
+
+if(data.length>0){
+
+updateMapMarker(
+parseFloat(data[0].lat),
+parseFloat(data[0].lon),
+data[0].display_name
+);
+
+}else{
+alert("Location not found");
+}
+
+}
+
+
+
+// UPDATE MARKER
+function updateMapMarker(lat,lng,label){
+
+currentLat = lat;
+currentLng = lng;
+
+document.getElementById('locationText').innerText = label;
+
+if(marker){
+map.removeLayer(marker);
+}
+
+marker = L.marker([lat,lng]).addTo(map)
+.bindPopup(label)
+.openPopup();
+
+map.setView([lat,lng],16);
+
+setTimeout(function(){
+map.invalidateSize();
+},500);
+
+}
+
+
+
+// SOS BUTTON
+document.getElementById('sosBtn').addEventListener('click', async () => {
+
+if(!currentLat || !currentLng){
+alert("Select location first!");
+return;
+}
+
+const response = await fetch('/sos',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({
+latitude:currentLat,
+longitude:currentLng,
+address:document.getElementById('locationText').innerText
+})
+});
+
+const result = await response.json();
+
+if(result.status==="success"){
+alert("SOS SENT!");
+}
+
+});
+
+
+window.onload = function(){
+setTimeout(initMap,500);
+};
+
+</script>
+
+{% endblock %}
